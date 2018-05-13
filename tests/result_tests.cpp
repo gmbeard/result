@@ -1,6 +1,11 @@
 #include "result/result.hpp"
 #include "catch.hpp"
 #include <system_error>
+#include <vector>
+#include <algorithm>
+#include <numeric>
+#include <memory>
+#include <string>
 
 using IoResult = result::Result<size_t, std::error_code>;
 TEST_CASE("Should construct ok value", "[result]") {
@@ -70,4 +75,49 @@ TEST_CASE("Should handle void result", "[result]") {
 
     v = result::ok();
     REQUIRE(v.is_ok());
+}
+
+TEST_CASE("Should have movable result", "[result]") {
+
+    using R = result::Result<std::vector<uint8_t>, 
+                             std::error_code>;
+
+    R r = result::ok(std::vector<uint8_t> { 1, 2, 3, 4});
+    auto v = std::move(r.value());
+    auto sum = std::accumulate(v.begin(), v.end(), 0);
+
+    REQUIRE(10 == sum);
+}
+
+template<typename T>
+struct ResultIsCopyConstructible {
+
+    template<typename _T, typename _E>
+    static std::true_type  test(result::Result<_T, _E>);
+
+    static std::false_type test(...);
+
+    static constexpr bool value = 
+        std::is_same<std::true_type, 
+            decltype(test(std::declval<T const&>()))>::value;
+};
+
+TEST_CASE("Should hold move-only types", "[result]") {
+   
+    using namespace std::literals;
+
+    using R = result::Result<std::unique_ptr<uint8_t>,
+                             std::string>;
+
+    REQUIRE(!std::is_copy_constructible<R>::value);
+    REQUIRE(std::is_move_constructible<R>::value);
+
+    R r = result::ok(std::make_unique<uint8_t>(42));
+
+    REQUIRE(r.is_ok());
+    REQUIRE(42 == *r.value());
+
+    r = result::err("Error!"s);
+    REQUIRE(!r.is_ok());
+    REQUIRE(r.error() == "Error!");
 }

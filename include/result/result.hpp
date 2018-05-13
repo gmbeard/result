@@ -34,7 +34,12 @@ namespace result {
         constexpr OkGuide OK_GUIDE { };
         constexpr ErrGuide ERR_GUIDE { };
 
-        template<typename T, typename E>
+        template<
+            typename T, 
+            typename E,
+            bool Copyable = 
+                std::is_copy_constructible<T>::value &&
+                std::is_copy_constructible<E>::value>
         struct Storage {
 
             Storage() noexcept :
@@ -179,6 +184,9 @@ namespace result {
                 static auto move_construct(Union& u, 
                                            Union&& item, 
                                            UnionTag tag) 
+                    noexcept(
+                        noexcept(T{std::declval<T>()}) &&
+                        noexcept(E{std::declval<E>()}))
                 {
                     switch (tag) {
                         case UnionTag::Empty:
@@ -196,6 +204,9 @@ namespace result {
                 static auto copy_construct(Union& u, 
                                            Union const& item, 
                                            UnionTag tag) 
+                    noexcept(
+                        noexcept(T{std::declval<T const&>()}) &&
+                        noexcept(E{std::declval<E const&>()}))
                 {
                     switch (tag) {
                         case UnionTag::Empty:
@@ -210,7 +221,7 @@ namespace result {
                     }
                 }
 
-                auto destroy(UnionTag tag) {
+                auto destroy(UnionTag tag) noexcept {
                     switch (tag) {
                         case UnionTag::Empty:
                             empty.~Default();
@@ -229,6 +240,28 @@ namespace result {
             UnionTag tag_;
         };
 
+        template<typename T, typename E>
+        struct Storage<T, E, false> : Storage<T, E, true> {
+
+            using Base = Storage<T, E, true>;
+
+            template<typename U>
+            Storage(Ok<U> ok)
+                noexcept(noexcept(Base{std::declval<Ok<U>>()})) :
+                Base{std::move(ok)}
+            { }
+
+            template<typename U>
+            Storage(Err<U> err)
+                noexcept(noexcept(Base{std::declval<Err<U>>()})) :
+                Base{std::move(err)}
+            { }
+
+            Storage(Storage&&) = default;
+            Storage(Storage const&) = delete;
+            auto operator=(Storage&&) -> Storage& = default;
+            auto operator=(Storage const&) -> Storage& = delete;
+        };
     }
 
     template<typename T>
@@ -296,7 +329,7 @@ namespace result {
             return Base::tag_ == Base::UnionTag::Value;
         }
 
-        auto value() const -> const T& {
+        auto value() -> T& {
             if (Base::tag_ != Base::UnionTag::Value) {
                 throw BadResultAccess { "The result contains an error" };
             }
@@ -304,12 +337,20 @@ namespace result {
             return Base::storage_.value;
         }
 
-        auto error() const -> const E& {
+        auto value() const -> const T& {
+            return const_cast<Result&>(*this).value();
+        }
+
+        auto error() -> E& {
             if (Base::tag_ != Base::UnionTag::Error) {
                 throw BadResultAccess { "The result doesn't contain an error" };
             }
 
             return Base::storage_.error;
+        }
+
+        auto error() const -> const E& {
+            return const_cast<Result&>(*this).error();
         }
     };
 
@@ -354,7 +395,7 @@ namespace result {
             return Base::tag_ == Base::UnionTag::Value;
         }
 
-        auto error() const -> const E& {
+        auto error() -> E& {
             if (Base::tag_ != Base::UnionTag::Error) {
                 throw BadResultAccess { "The result doesn't contain an error" };
             }
@@ -362,6 +403,9 @@ namespace result {
             return Base::storage_.error;
         }
 
+        auto error() const -> const E& {
+            return const_cast<Result&>(*this).error();
+        }
     };
 }
 #endif //RESULT_RESULT_HPP_INCLUDED

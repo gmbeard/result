@@ -27,16 +27,218 @@ namespace result {
             E value_;
         };
 
+        struct VoidType { };
         struct OkGuide { };
         struct ErrGuide { };
 
         constexpr OkGuide OK_GUIDE { };
         constexpr ErrGuide ERR_GUIDE { };
+
+        template<typename T, typename E>
+        struct Storage {
+
+            Storage() noexcept :
+                storage_{}
+            ,   tag_{UnionTag::Empty}
+            { }
+
+            template<typename U>
+            Storage(Ok<U> ok)
+                noexcept(noexcept(T{std::declval<U>()})) :
+                storage_{std::move(ok.get()), VALUE}
+            ,   tag_{UnionTag::Value}
+            { }
+
+            template<typename U>
+            Storage(Err<U> err)
+                noexcept(noexcept(E{std::declval<U>()})) :
+                storage_{std::move(err.get()), ERROR}
+            ,   tag_{UnionTag::Error}
+            { }
+
+            Storage(Storage&& other)
+                noexcept(
+                    noexcept(T{std::declval<T>()}) &&
+                    noexcept(E{std::declval<E>()})) :
+                storage_{}
+            ,   tag_{UnionTag::Empty}
+            {
+                storage_.destroy(tag_);
+                move_construct(*this, std::move(other));
+            }
+
+            Storage(Storage const& other)
+                noexcept(
+                    noexcept(T{std::declval<T const&>()}) &&
+                    noexcept(E{std::declval<E const&>()})) :
+                storage_{}
+            ,   tag_{UnionTag::Empty}
+            {
+                storage_.destroy(tag_);
+                copy_construct(*this, other);
+            }
+
+            auto operator=(Storage&& other)
+                noexcept(
+                    noexcept(T{std::declval<T>()}) &&
+                    noexcept(E{std::declval<E>()}))
+                    -> Storage&
+            {
+                storage_.destroy(tag_);
+                move_construct(*this, std::move(other));
+                return *this;
+            }
+
+            auto operator=(Storage const& other)
+                noexcept(
+                    noexcept(T{std::declval<T const&>()}) &&
+                    noexcept(E{std::declval<E const&>()}))
+                    -> Storage&
+            {
+                storage_.destroy(tag_);
+                copy_construct(*this, other);
+                return *this;
+            }
+
+            ~Storage() {
+                storage_.destroy(tag_);
+            }
+
+            static auto move_construct(Storage& _this,
+                                       Storage&& other)
+                noexcept(
+                    noexcept(T{std::declval<T>()}) &&
+                    noexcept(E{std::declval<E>()}))
+            {
+                try {
+                    Union::move_construct(_this.storage_, 
+                                          std::move(other.storage_),
+                                          other.tag_);
+                    _this.tag_ = other.tag_;
+                }
+                catch (...) {
+                    new (&_this.storage_.empty) Default{};
+                    throw;
+                }
+            }
+
+            static auto copy_construct(Storage& _this,
+                                       Storage const& other)
+                noexcept(
+                    noexcept(T{std::declval<T const&>()}) &&
+                    noexcept(E{std::declval<E const&>()}))
+            {
+                try {
+                    Union::copy_construct(_this.storage_, 
+                                          other.storage_,
+                                          other.tag_);
+                    _this.tag_ = other.tag_;
+                }
+                catch (...) {
+                    new (&_this.storage_.empty) Default{};
+                    throw;
+                }
+            }
+
+            struct Default { };
+            struct ValueGuide { };
+            struct ErrorGuide { };
+
+            static constexpr ValueGuide VALUE { };
+            static constexpr ErrorGuide ERROR { };
+
+            enum class UnionTag {
+                Empty,
+                Value,
+                Error
+            };
+
+            union Union {
+                Default empty;
+                T value;
+                E error;
+
+                Union() noexcept :
+                    empty{}
+                { }
+
+                template<typename U>
+                Union(U&& item, ValueGuide)
+                    noexcept(noexcept(T{std::forward<U>(item)})) :
+                    value{std::forward<U>(item)}
+                { }
+
+                template<typename U>
+                Union(U&& item, ErrorGuide)
+                    noexcept(noexcept(E{std::forward<U>(item)})) :
+                    error{std::forward<U>(item)}
+                { }
+
+                ~Union() { }
+
+                static auto move_construct(Union& u, 
+                                           Union&& item, 
+                                           UnionTag tag) 
+                {
+                    switch (tag) {
+                        case UnionTag::Empty:
+                            new (&u.empty) Default{std::move(item.empty)};
+                            break;
+                        case UnionTag::Value:
+                            new (&u.value) T{std::move(item.value)};
+                            break;
+                        case UnionTag::Error:
+                            new (&u.error) E{std::move(item.error)};
+                            break;
+                    }
+                }
+
+                static auto copy_construct(Union& u, 
+                                           Union const& item, 
+                                           UnionTag tag) 
+                {
+                    switch (tag) {
+                        case UnionTag::Empty:
+                            new (&u.empty) Default{item.empty};
+                            break;
+                        case UnionTag::Value:
+                            new (&u.value) T{item.value};
+                            break;
+                        case UnionTag::Error:
+                            new (&u.error) E{item.error};
+                            break;
+                    }
+                }
+
+                auto destroy(UnionTag tag) {
+                    switch (tag) {
+                        case UnionTag::Empty:
+                            empty.~Default();
+                            break;
+                        case UnionTag::Value:
+                            value.~T();
+                            break;
+                        case UnionTag::Error:
+                            error.~E();
+                            break;
+                    }
+                }
+            };
+
+            Union storage_;
+            UnionTag tag_;
+        };
+
     }
 
     template<typename T>
     auto ok(T&& value) -> detail::Ok<T> {
         return detail::Ok<T>{std::forward<T>(value)};
+    }
+
+    auto ok() -> detail::Ok<detail::VoidType> {
+        return detail::Ok<detail::VoidType>{
+            detail::VoidType{}};
     }
 
     template<typename E>
@@ -51,223 +253,115 @@ namespace result {
     };
 
     template<typename T, typename E>
-    struct Result {
+    struct Result : 
+        private detail::Storage<T, E> 
+    {
 
-        static_assert(
-            std::is_nothrow_default_constructible<T>::value,
-            "`T` must be nothrow default constructible"
-        );
+        using Base = detail::Storage<T, E>;
 
         template<typename U>
         Result(detail::Ok<U> ok) 
-            noexcept(noexcept(T{std::declval<U>()})) :
-            good_result_{true}
-        ,   storage_{std::move(ok.get()), detail::OK_GUIDE}
+            noexcept(noexcept(Base{std::move(ok)})) :
+            Base{std::move(ok)}
         { }
-
+        
         template<typename U>
         Result(detail::Err<U> err) 
-            noexcept(noexcept(E{std::declval<U>()})):
-            good_result_{false}
-        ,   storage_{std::move(err.get()), detail::ERR_GUIDE}
+            noexcept(noexcept(Base{std::move(err)})) :
+            Base{std::move(err)}
         { }
 
-        Result(Result&& other) 
-            noexcept(
-                noexcept(T{std::declval<T>()}) &&
-                noexcept(E{std::declval<E>()})
-            ) :
-            good_result_{other.good_result_}
-        ,   storage_{T{}}
-        { 
-            storage_.destroy(true);
-            move_construct(*this, std::forward<Result>(other));
-        }
+        Result() = delete;
 
-        Result(Result const& other)
-            noexcept(
-                noexcept(T{std::declval<T const&>()}) &&
-                noexcept(E{std::declval<E const&>()})
-            ) :
-            good_result_{other.good_result_}
-        ,   storage_{T{}}
-        { 
-            storage_.destroy(true);
-            copy_construct(*this, other);
-        }
-
-        auto operator=(Result&& other)
-            noexcept(
-                noexcept(T{std::declval<T>()}) &&
-                noexcept(E{std::declval<E>()})
-            ) -> Result&
+        friend auto operator==(Result const& lhs,
+                               Result const& rhs) noexcept 
+            -> bool
         {
-            storage_.destroy(good_result_);
-            move_construct(*this, std::forward<Result>(other));
-            return *this;
+            return (lhs.tag_ == rhs.tag_) &&
+                (lhs.tag_ == Base::UnionTag::Empty ||
+                    (lhs.tag_ == Base::UnionTag::Value && 
+                        lhs.storage_.value == rhs.storage_.value) ||
+                    (lhs.tag_ == Base::UnionTag::Error &&
+                        lhs.storage_.error == rhs.storage_.error));
         }
 
-        auto operator=(Result const& other)
-            noexcept(
-                noexcept(T{std::declval<T const&>()}) &&
-                noexcept(E{std::declval<E const&>()})
-            ) -> Result&
-        {
-            storage_.destroy(good_result_);
-            copy_construct(*this, other);
-            return *this;
-        }
-
-        ~Result() {
-            storage_.destroy(good_result_);
-        }
-
-        auto is_ok() const noexcept -> bool {
-            return good_result_;
-        }
-
-        auto value() -> T& {
-            if (!is_ok()) {
-                throw BadResultAccess{
-                    "Result contains an error"
-                };
-            }
-
-            return storage_.success;
-        }
-
-        auto value() const -> T const& {
-            return const_cast<Result&>(*this).value();
-        }
-
-        auto error() -> E& {
-            if (is_ok()) {
-                throw BadResultAccess{
-                    "Result doesn't contain an error"
-                };
-            }
-
-            return storage_.error;
-        }
-
-        auto error() const -> E const& {
-            return const_cast<Result&>(*this).error();
-        }
-
-        friend auto operator==(Result const& lhs, 
-                               Result const& rhs) noexcept -> bool 
-        {
-            return lhs.good_result_ == rhs.good_result_ && (
-                (lhs.good_result_ && lhs.value() == rhs.value()) ||
-                (!lhs.good_result_ && lhs.error() == rhs.error())
-            );
-        }
-
-        friend auto operator!=(Result const& lhs, 
-                               Result const& rhs) noexcept -> bool 
+        friend auto operator!=(Result const& lhs,
+                               Result const& rhs) noexcept
+            -> bool
         {
             return !(lhs == rhs);
         }
 
-    private:
-
-        auto static move_construct(Result& _this, Result&& other) {
-            _this.good_result_ = other.good_result_;
-
-            try {
-                Storage::move_construct(_this.storage_,
-                                        std::move(other.storage_),
-                                        _this.good_result_);
-            }
-            catch (...) {
-                new (&_this.storage_.success) T{};
-                _this.good_result_ = true;
-                throw;
-            }
+        auto is_ok() const noexcept -> bool {
+            return Base::tag_ == Base::UnionTag::Value;
         }
 
-        auto static copy_construct(Result& _this, Result const& other) {
-            _this.good_result_ = other.good_result_;
-            try {
-                Storage::copy_construct(_this.storage_,
-                                        std::move(other.storage_),
-                                        _this.good_result_);
+        auto value() const -> const T& {
+            if (Base::tag_ != Base::UnionTag::Value) {
+                throw BadResultAccess { "The result contains an error" };
             }
-            catch (...) {
-                new (&_this.storage_.success) T{};
-                _this.good_result_ = true;
-                throw;
-            }
+
+            return Base::storage_.value;
         }
 
-        union Storage {
-            T success;
-            E error;
-
-            Storage(T good) :
-                success{std::move(good)}
-            { }
-
-            Storage(E bad) :
-                error{std::move(bad)}
-            { }
-
-            template<typename U>
-            Storage(U&& good, detail::OkGuide) :
-                success{std::forward<U>(good)}
-            { }
-
-            template<typename U>
-            Storage(U&& bad, detail::ErrGuide) :
-                error{std::forward<U>(bad)}
-            { }
-
-            ~Storage() { }
-
-            static auto copy_construct(Storage& _this,
-                                       Storage const& other,
-                                       bool other_is_good)
-                noexcept(
-                    noexcept(T{std::declval<T const&>()}) &&
-                    noexcept(E{std::declval<E const&>()})
-                )
-            {
-                if (other_is_good) {
-                    return new (&_this.success) T{other.success};
-                }
-                else {
-                    return new (&_this.error) E{other.error};
-                }
+        auto error() const -> const E& {
+            if (Base::tag_ != Base::UnionTag::Error) {
+                throw BadResultAccess { "The result doesn't contain an error" };
             }
 
-            static auto move_construct(Storage& _this, 
-                                       Storage&& other,
-                                       bool other_is_good)
-                noexcept(
-                    noexcept(T{std::declval<T>()}) &&
-                    noexcept(E{std::declval<E>()})
-                )
-            {
-                if (other_is_good) {
-                    new (&_this.success) T{std::move(other.success)};
-                }
-                else {
-                    new (&_this.error) E{std::move(other.error)};
-                }
+            return Base::storage_.error;
+        }
+    };
+
+    template<typename E>
+    struct Result<void, E> : 
+        private detail::Storage<detail::VoidType, E> 
+    {
+
+        using Base = detail::Storage<detail::VoidType, E>;
+
+        Result(detail::Ok<detail::VoidType> ok) noexcept :
+            Base{ok}
+        { }
+
+        template<typename U>
+        Result(detail::Err<U> err) 
+            noexcept(noexcept(Base{std::move(err)})) :
+            Base{std::move(err)}
+        { }
+
+        Result() = delete;
+
+        friend auto operator==(Result const& lhs,
+                               Result const& rhs) noexcept 
+            -> bool
+        {
+            return (lhs.tag_ == rhs.tag_) &&
+                (lhs.tag_ == Base::UnionTag::Empty ||
+                lhs.tag_ == Base::UnionTag::Value ||
+                (lhs.tag_ == Base::UnionTag::Error &&
+                    lhs.storage_.error == rhs.storage_.error));
+        }
+
+        friend auto operator!=(Result const& lhs,
+                               Result const& rhs) noexcept
+            -> bool
+        {
+            return !(lhs == rhs);
+        }
+
+        auto is_ok() const noexcept -> bool {
+            return Base::tag_ == Base::UnionTag::Value;
+        }
+
+        auto error() const -> const E& {
+            if (Base::tag_ != Base::UnionTag::Error) {
+                throw BadResultAccess { "The result doesn't contain an error" };
             }
 
-            auto destroy(bool good) -> void {
-                if (good) {
-                    success.~T();
-                }
-                else {
-                    error.~E();
-                }
-            }
-        };
+            return Base::storage_.error;
+        }
 
-        bool good_result_;
-        Storage storage_;
     };
 }
 #endif //RESULT_RESULT_HPP_INCLUDED

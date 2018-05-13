@@ -44,9 +44,34 @@ TEST_CASE("Should compare equality", "[result]") {
 
     REQUIRE(result::ok(42ul) == r);
     REQUIRE(
-        result::err(std::make_error_code(std::errc::operation_would_block)) !=
-        r
+        result::err(
+            std::make_error_code(
+                std::errc::operation_would_block)) != r
     );
 
     REQUIRE(r != result::ok(43ul));
+}
+
+TEST_CASE("Should handle void result", "[result]") {
+
+    using NoValue = result::Result<void, std::error_code>;
+
+    NoValue v = 
+        result::err(
+            std::make_error_code(std::errc::operation_would_block));
+
+    NoValue v1 = result::ok();
+
+    v = v1;
+
+    REQUIRE(!v.is_ok());
+    REQUIRE(
+        result::err(
+            std::make_error_code(
+                std::errc::operation_would_block)) == v
+    );
+
+
+    v = result::ok();
+    REQUIRE(v.is_ok());
 }

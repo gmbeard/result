@@ -60,10 +60,6 @@ TEST_CASE("Should handle void result", "[result]") {
         result::err(
             std::make_error_code(std::errc::operation_would_block));
 
-    NoValue v1 = result::ok();
-
-    v = v1;
-
     REQUIRE(!v.is_ok());
     REQUIRE(
         result::err(

@@ -269,7 +269,7 @@ namespace result {
         return detail::Ok<T>{std::forward<T>(value)};
     }
 
-    auto ok() -> detail::Ok<detail::VoidType> {
+    inline auto ok() -> detail::Ok<detail::VoidType> {
         return detail::Ok<detail::VoidType>{
             detail::VoidType{}};
     }

@@ -28,11 +28,6 @@ namespace result {
         };
 
         struct VoidType { };
-        struct OkGuide { };
-        struct ErrGuide { };
-
-        constexpr OkGuide OK_GUIDE { };
-        constexpr ErrGuide ERR_GUIDE { };
 
         template<
             typename T, 
@@ -265,8 +260,10 @@ namespace result {
     }
 
     template<typename T>
-    auto ok(T&& value) -> detail::Ok<T> {
-        return detail::Ok<T>{std::forward<T>(value)};
+    auto ok(T&& value) 
+        -> detail::Ok<typename std::remove_reference<T>::type> 
+    {
+        return { std::forward<T>(value) };
     }
 
     inline auto ok() -> detail::Ok<detail::VoidType> {
@@ -275,8 +272,10 @@ namespace result {
     }
 
     template<typename E>
-    auto err(E&& value) -> detail::Err<E> {
-        return detail::Err<E>{std::forward<E>(value)};
+    auto err(E&& value) 
+        -> detail::Err<typename std::remove_reference<E>::type> 
+    {
+        return { std::forward<E>(value) };
     }
 
     struct BadResultAccess : std::runtime_error {

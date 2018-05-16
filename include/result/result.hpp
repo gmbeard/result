@@ -328,6 +328,10 @@ namespace result {
             return Base::tag_ == Base::UnionTag::Value;
         }
 
+        operator bool() const {
+            return is_ok();
+        }
+
         auto value() & -> T& {
             if (Base::tag_ != Base::UnionTag::Value) {
                 throw BadResultAccess { "The result contains an error" };
@@ -400,6 +404,10 @@ namespace result {
 
         auto is_ok() const noexcept -> bool {
             return Base::tag_ == Base::UnionTag::Value;
+        }
+
+        operator bool() const {
+            return is_ok();
         }
 
         auto error() & -> E& {

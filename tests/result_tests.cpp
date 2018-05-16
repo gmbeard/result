@@ -156,3 +156,17 @@ TEST_CASE("Should perfectly forward values and errors on get", "[result]") {
     REQUIRE(ConvertsError<R&, std::string>);
     REQUIRE(ConvertsError<R const&, std::string>);
 }
+
+TEST_CASE("Should implicity cast results to bool") {
+
+    using R = result::Result<void, std::string>;
+
+    R result = result::ok();
+
+    if (auto& r = result) {
+        REQUIRE(true);
+        return;
+    }
+
+    REQUIRE(false);
+}

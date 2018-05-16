@@ -328,7 +328,7 @@ namespace result {
             return Base::tag_ == Base::UnionTag::Value;
         }
 
-        auto value() -> T& {
+        auto value() & -> T& {
             if (Base::tag_ != Base::UnionTag::Value) {
                 throw BadResultAccess { "The result contains an error" };
             }
@@ -336,11 +336,15 @@ namespace result {
             return Base::storage_.value;
         }
 
-        auto value() const -> const T& {
+        auto value() const& -> const T& {
             return const_cast<Result&>(*this).value();
         }
 
-        auto error() -> E& {
+        auto value() && -> T&& {
+            return std::move(value());
+        }
+
+        auto error() & -> E& {
             if (Base::tag_ != Base::UnionTag::Error) {
                 throw BadResultAccess { "The result doesn't contain an error" };
             }
@@ -348,8 +352,12 @@ namespace result {
             return Base::storage_.error;
         }
 
-        auto error() const -> const E& {
+        auto error() const& -> const E& {
             return const_cast<Result&>(*this).error();
+        }
+
+        auto error() && -> E&& {
+            return std::move(error());
         }
     };
 
@@ -394,7 +402,7 @@ namespace result {
             return Base::tag_ == Base::UnionTag::Value;
         }
 
-        auto error() -> E& {
+        auto error() & -> E& {
             if (Base::tag_ != Base::UnionTag::Error) {
                 throw BadResultAccess { "The result doesn't contain an error" };
             }
@@ -402,9 +410,43 @@ namespace result {
             return Base::storage_.error;
         }
 
-        auto error() const -> const E& {
+        auto error() const& -> const E& {
             return const_cast<Result&>(*this).error();
         }
+
+        auto error() && -> E&& {
+            return std::move(error());
+        }
     };
+
+    template<typename T, typename E>
+    auto& value(Result<T, E>& r) {
+        return r.value();
+    }
+
+    template<typename T, typename E>
+    auto&& value(Result<T, E>&& r) {
+        return std::move(r).value();
+    }
+
+    template<typename T, typename E>
+    auto const& value(Result<T, E> const& r) {
+        return r.value();
+    }
+
+    template<typename T, typename E>
+    auto& error(Result<T, E>& r) {
+        return r.error();
+    }
+
+    template<typename T, typename E>
+    auto&& error(Result<T, E>&& r) {
+        return std::move(r).error();
+    }
+
+    template<typename T, typename E>
+    auto const& error(Result<T, E> const& r) {
+        return r.error();
+    }
 }
 #endif //RESULT_RESULT_HPP_INCLUDED

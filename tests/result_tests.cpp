@@ -89,19 +89,6 @@ TEST_CASE("Should have movable result", "[result]") {
     REQUIRE(10 == sum);
 }
 
-template<typename T>
-struct ResultIsCopyConstructible {
-
-    template<typename _T, typename _E>
-    static std::true_type  test(result::Result<_T, _E>);
-
-    static std::false_type test(...);
-
-    static constexpr bool value = 
-        std::is_same<std::true_type, 
-            decltype(test(std::declval<T const&>()))>::value;
-};
-
 TEST_CASE("Should hold move-only types", "[result]") {
    
     using namespace std::literals;
@@ -120,4 +107,52 @@ TEST_CASE("Should hold move-only types", "[result]") {
     r = result::err("Error!"s);
     REQUIRE(!r.is_ok());
     REQUIRE(r.error() == "Error!");
+}
+
+namespace type_tests {
+    template<typename... >
+    using VoidT = void;
+
+    template<typename From, typename To>
+    using ConvertsValueTo =
+        decltype(To { result::value(std::declval<From>()) });
+
+    template<typename From, typename To>
+    using ConvertsErrorTo =
+        decltype(To { result::error(std::declval<From>()) });
+
+    template<typename T, 
+             template <typename...> class Op, 
+             typename... Args>
+    struct Test 
+        : std::false_type 
+    { };
+
+    template<template <typename...> class Op, 
+             typename... Args>
+    struct Test<VoidT<Op<Args...>>, Op, Args...> 
+        : std::true_type 
+    { };
+}
+
+template<typename From, typename To>
+constexpr bool ConvertsValue = 
+    type_tests::Test<void, type_tests::ConvertsValueTo, From, To> { };
+
+template<typename From, typename To>
+constexpr bool ConvertsError = 
+    type_tests::Test<void, type_tests::ConvertsErrorTo, From, To> { };
+
+TEST_CASE("Should perfectly forward values and errors on get", "[result]") {
+
+    using R = result::Result<std::unique_ptr<uint8_t>,
+                             std::string>;
+
+    REQUIRE(ConvertsValue<R&&, std::unique_ptr<uint8_t>>);
+    REQUIRE(!ConvertsValue<R&, std::unique_ptr<uint8_t>>);
+    REQUIRE(!ConvertsValue<R const&, std::unique_ptr<uint8_t>>);
+
+    REQUIRE(ConvertsError<R&&, std::string>);
+    REQUIRE(ConvertsError<R&, std::string>);
+    REQUIRE(ConvertsError<R const&, std::string>);
 }

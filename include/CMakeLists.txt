@@ -31,7 +31,7 @@ install(
     TARGETS
         result
     EXPORT
-        ResultExport
+        ResultTargets
 )
 
 add_library(Result::result ALIAS result)

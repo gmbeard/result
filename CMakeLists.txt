@@ -18,11 +18,11 @@ endif()
 
 install(
     EXPORT 
-        ResultExport
+        ResultTargets
     NAMESPACE 
         Result::
     FILE 
-        ResultTarget.cmake
+        ResultTargets.cmake
     DESTINATION
         lib/cmake/result
 )

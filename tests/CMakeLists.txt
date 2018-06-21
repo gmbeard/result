@@ -1,4 +1,4 @@
-add_subdirectory(catch)
+find_package(Catch2)
 
 add_executable(
     result_tests

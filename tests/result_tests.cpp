@@ -1,4 +1,5 @@
 #include "result/result.hpp"
+#include "result/traits.hpp"
 #include "catch.hpp"
 #include <system_error>
 #include <vector>
@@ -169,4 +170,69 @@ TEST_CASE("Should implicity cast results to bool") {
     }
 
     REQUIRE(false);
+}
+
+TEST_CASE("Result traits") {
+    using namespace result::traits;
+    using result::Result;
+    using RecursiveValue = Result<Result<size_t, std::string>, int>;
+    using RecursiveError = Result<int, Result<size_t, std::string>>;
+    using NonRecursive = Result<size_t, std::string>;
+
+    REQUIRE(
+        std::is_same<
+            size_t, 
+            typename inner_result_value_traits<RecursiveValue>::value_type
+        >::value);
+
+    REQUIRE(
+        std::is_same<
+            std::string,
+            typename inner_result_error_traits<RecursiveError>::error_type
+        >::value);
+
+    REQUIRE(
+        std::is_same<
+            size_t, 
+            typename inner_result_value_traits<NonRecursive>::value_type
+        >::value);
+
+    REQUIRE(
+        std::is_same<
+            std::string,
+            typename inner_result_error_traits<NonRecursive>::error_type
+        >::value);
+
+    REQUIRE(
+        result_traits<RecursiveError>::error_is_result::value);
+
+    REQUIRE(
+        !result_traits<NonRecursive>::value_is_result::value);
+}
+
+TEST_CASE("Result mapping") {
+    using result::Result; 
+    using R = Result<int, size_t>;
+
+    {
+        auto r = R { result::ok(42) };
+
+        auto r1 = map(std::move(r), [](auto val) { 
+            return std::to_string(val); 
+        });
+
+        REQUIRE(value(std::move(r1)) == "42");
+    }
+
+    {
+        bool called = false;
+        auto r = R { result::err(42ul) };
+        auto r1 = map(std::move(r), [&called](auto val) {
+            called = true;
+            return std::to_string(val);
+        });
+
+        REQUIRE(!called);
+        REQUIRE(!r1);
+    }
 }

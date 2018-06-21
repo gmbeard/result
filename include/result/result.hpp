@@ -1,6 +1,7 @@
 #ifndef RESULT_RESULT_HPP_INCLUDED
 #define RESULT_RESULT_HPP_INCLUDED
 
+#include "result/traits.hpp"
 #include <stdexcept>
 #include <type_traits>
 
@@ -363,6 +364,45 @@ namespace result {
         auto error() && -> E&& {
             return std::move(error());
         }
+
+        template<typename F>
+        auto map(F&& f) &&
+            -> Result<typename std::result_of<F(T&&)>::type, E>
+        {
+            if (is_ok()) {
+                return result::ok(
+                    std::forward<F>(f)(std::move(*this).value()));
+            }
+            return result::err(std::move(*this).error());
+        }
+
+        template<typename F>
+        auto map_err(F&& f) &&
+            -> Result<T, typename std::result_of<F(E&&)>::type>
+        {
+            if (!is_ok()) {
+                return result::err(
+                    std::forward<F>(f)(std::move(*this).error()));
+            }
+            return result::ok(std::move(*this).value());
+        }
+
+        template<
+            typename F,
+            typename R = 
+                typename std::remove_reference<
+                    typename std::result_of<F(T&&)>::type>::type,
+            typename 
+                std::enable_if<traits::is_result<R>::value>::type* = nullptr
+        >
+        auto and_then(F&& f) &&
+            -> Result<typename traits::result_traits<R>::value_type, E>
+        {
+            if (is_ok()) {
+                return std::forward<F>(f)(std::move(*this).value());
+            }
+            return result::err(std::move(*this).error());
+        }
     };
 
     template<typename E>
@@ -425,6 +465,27 @@ namespace result {
         auto error() && -> E&& {
             return std::move(error());
         }
+
+        template<typename F>
+        auto map(F&& f) &&
+            -> Result<typename std::result_of<F()>::type, E>
+        {
+            if (is_ok()) {
+                return result::ok(std::forward<F>(f)());
+            }
+            return result::err(std::move(*this).error());
+        }
+
+        template<typename F>
+        auto map_err(F&& f) &&
+            -> Result<void, typename std::result_of<F(E&&)>::type>
+        {
+            if (!is_ok()) {
+                return result::err(
+                    std::forward<F>(f)(std::move(*this).error()));
+            }
+            return result::ok(std::move(*this).value());
+        }
     };
 
     template<typename T, typename E>
@@ -455,6 +516,16 @@ namespace result {
     template<typename T, typename E>
     auto const& error(Result<T, E> const& r) {
         return r.error();
+    }
+
+    template<typename T, typename E, typename F>
+    auto map(Result<T, E>&& r, F&& f) {
+        return std::move(r).map(std::forward<F>(f));
+    }
+
+    template<typename T, typename E, typename F>
+    auto map_err(Result<T, E>&& r, F&& f) {
+        return std::move(r).map_err(std::forward<F>(f));
     }
 }
 #endif //RESULT_RESULT_HPP_INCLUDED

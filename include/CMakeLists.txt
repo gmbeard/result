@@ -1,3 +1,5 @@
+find_package(Cncpts REQUIRED)
+
 add_library(result INTERFACE)
 
 target_include_directories(
@@ -18,6 +20,12 @@ target_compile_options(
     INTERFACE
         $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Werror -Wextra>
         $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
+)
+
+target_link_libraries(
+    result
+    INTERFACE
+        Cncpts::cncpts
 )
 
 install(

@@ -2,6 +2,18 @@ cmake_minimum_required(VERSION 3.7)
 
 project(Result)
 
+list(APPEND
+    CMAKE_PREFIX_PATH
+    ${CMAKE_CURRENT_LIST_DIR}/deps
+)
+
+list(APPEND
+    CMAKE_MODULE_PATH
+    ${CMAKE_CURRENT_LIST_DIR}/submodules/cmake
+)
+
+include(InstallExternals)
+
 add_subdirectory(include)
 
 set(RESULT_ENABLE_TESTING

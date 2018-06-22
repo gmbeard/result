@@ -100,7 +100,7 @@ TEST_CASE("Should hold move-only types", "[result]") {
     REQUIRE(!std::is_copy_constructible<R>::value);
     REQUIRE(std::is_move_constructible<R>::value);
 
-    R r = result::ok(std::make_unique<uint8_t>(42));
+    R r = result::ok(std::make_unique<uint8_t>(static_cast<uint8_t>(42)));
 
     REQUIRE(r.is_ok());
     REQUIRE(42 == *r.value());

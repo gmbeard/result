@@ -19,7 +19,7 @@ target_compile_options(
     result
     INTERFACE
         $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Werror -Wextra>
-        $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
+        $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX /wd4297>
 )
 
 target_link_libraries(

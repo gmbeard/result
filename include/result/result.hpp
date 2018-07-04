@@ -392,16 +392,41 @@ namespace result {
             typename R = 
                 typename std::remove_reference<
                     typename std::result_of<F(T&&)>::type>::type,
+            typename VT = 
+                typename traits::result_traits<R>::value_type,
             typename 
                 std::enable_if<traits::is_result<R>::value>::type* = nullptr
         >
-        auto and_then(F&& f) &&
-            -> Result<typename traits::result_traits<R>::value_type, E>
-        {
+        auto and_then(F&& f) && -> Result<VT, E> {
             if (is_ok()) {
                 return std::forward<F>(f)(std::move(*this).value());
             }
             return result::err(std::move(*this).error());
+        }
+
+        template<
+            typename F,
+            typename R = 
+                typename std::remove_reference<
+                    typename std::result_of<F(T&&)>::type>::type,
+            typename ET = 
+                typename traits::result_traits<R>::value_type,
+            typename 
+                std::enable_if<traits::is_result<R>::value>::type* = nullptr
+        >
+        auto or_else(F&& f) && -> Result<T, ET> {
+            if (!is_ok()) {
+                return std::forward<F>(f)(std::move(*this).error());
+            }
+            return result::ok(std::move(*this).value());
+        }
+
+        template<typename F>
+        auto value_or_else(F&& f) && -> T {
+            if (is_ok()) {
+                return std::move(*this).value();
+            }
+            return std::forward<F>(f)();
         }
     };
 
@@ -486,6 +511,23 @@ namespace result {
             }
             return result::ok(std::move(*this).value());
         }
+
+        template<
+            typename F,
+            typename R = 
+                typename std::remove_reference<
+                    typename std::result_of<F(T&&)>::type>::type,
+            typename ET = 
+                typename traits::result_traits<R>::value_type,
+            typename 
+                std::enable_if<traits::is_result<R>::value>::type* = nullptr
+        >
+        auto or_else(F&& f) && -> Result<void, ET> {
+            if (!is_ok()) {
+                return std::forward<F>(f)(std::move(*this).error());
+            }
+            return result::ok();
+        }
     };
 
     template<typename T, typename E>
@@ -501,6 +543,11 @@ namespace result {
     template<typename T, typename E>
     auto const& value(Result<T, E> const& r) {
         return r.value();
+    }
+
+    template<typename T, typename E, typename F>
+    auto value_or_else(Result<T, E>&& r, F&& f) {
+        return std::move(r).value_or_else(std::forward<F>(f));
     }
 
     template<typename T, typename E>
@@ -526,6 +573,16 @@ namespace result {
     template<typename T, typename E, typename F>
     auto map_err(Result<T, E>&& r, F&& f) {
         return std::move(r).map_err(std::forward<F>(f));
+    }
+
+    template<typename T, typename E, typename F>
+    auto and_then(Result<T, E>&& r, F&& f) {
+        return std::move(r).and_then(std::forward<F>(f));
+    }
+
+    template<typename T, typename E, typename F>
+    auto or_else(Result<T, E>&& r, F&& f) {
+        return std::move(r).or_else(std::forward<F>(f));
     }
 }
 #endif //RESULT_RESULT_HPP_INCLUDED

@@ -180,6 +180,9 @@ TEST_CASE("Result traits") {
     using NonRecursive = Result<size_t, std::string>;
 
     REQUIRE(
+        is_convertible_to_result<decltype(result::ok(42)), int, size_t>::value);
+
+    REQUIRE(
         std::is_same<
             size_t, 
             typename inner_result_value_traits<RecursiveValue>::value_type
@@ -234,5 +237,70 @@ TEST_CASE("Result mapping") {
 
         REQUIRE(!called);
         REQUIRE(!r1);
+    }
+}
+
+TEST_CASE("and_then") {
+    using result::Result;
+
+    using R = Result<int, size_t>;
+
+    {
+        auto r = R { result::ok(42) };
+
+        auto r1 = result::and_then(std::move(r), [](auto int_val) {
+            return result::ok(std::to_string(int_val * 2));
+        })
+        .and_then([](auto str_val) {
+            return result::ok(str_val + " - Hello");
+        });
+
+        REQUIRE(value(std::move(r1)) == "84 - Hello");
+    }
+
+    {
+        auto r = R { result::ok(42) };
+
+        auto r1 = result::and_then(std::move(r), [](auto int_val) {
+            return result::ok(std::to_string(int_val * 2));
+        })
+        .and_then([](auto str_val) {
+            return result::err(42ul); //str_val + " - Hello");
+        });
+
+        REQUIRE(error(std::move(r1)) == 42ul);
+    }
+}
+
+TEST_CASE("or_else") {
+    using result::Result;
+
+    using R = Result<int, size_t>;
+
+    {
+        auto r = R { result::err(42ul) };
+
+        auto r1 = result::or_else(std::move(r), [](auto size_t_val) {
+            return result::ok<int>(size_t_val * 2);
+        });
+
+        REQUIRE(value(std::move(r1)) == 84);
+    }
+}
+
+TEST_CASE("value_or_else") {
+
+    using R = result::Result<int, std::string>;
+
+    {
+        auto r = R { result::err(std::string { "An error occurred!" }) };
+        auto val = result::value_or_else(std::move(r), []() { return 42; });
+        REQUIRE(val == 42);
+    }
+
+    {
+        auto r = R { result::ok(41) };
+        auto val = result::value_or_else(std::move(r), []() { return 42; });
+        REQUIRE(val == 41);
     }
 }

@@ -3,25 +3,26 @@ cmake_minimum_required(VERSION 3.7)
 project(Result)
 
 list(APPEND
-    CMAKE_PREFIX_PATH
-    ${CMAKE_CURRENT_LIST_DIR}/deps
-)
-
-list(APPEND
     CMAKE_MODULE_PATH
-    ${CMAKE_CURRENT_LIST_DIR}/submodules/cmake
+    ${CMAKE_CURRENT_LIST_DIR}/cmake
 )
 
-include(InstallExternals)
+option(SKIP_SUPERBUILD
+    "SuperBuild for ${PROJECT_NAME}"
+    OFF
+)
+
+option(RESULT_ENABLE_TESTING
+    "Enable unit tests for ${PROJECT_NAME}"
+    OFF
+)
+
+if(NOT SKIP_SUPERBUILD)
+    include(SuperBuild)
+    return()
+endif()
 
 add_subdirectory(include)
-
-set(RESULT_ENABLE_TESTING
-    OFF
-    CACHE
-    BOOL
-    "Enable unit tests for ${PROJECT_NAME}"
-)
 
 if(RESULT_ENABLE_TESTING)
     enable_testing()

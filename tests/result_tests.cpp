@@ -1,6 +1,6 @@
 #include "result/result.hpp"
 #include "result/traits.hpp"
-#include "catch.hpp"
+#include "catch2/catch.hpp"
 #include <system_error>
 #include <vector>
 #include <algorithm>

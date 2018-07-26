@@ -1,3 +1,0 @@
-[submodule "submodules/cmake"]
-	path = submodules/cmake
-	url = https://github.com/gmbeard/cmake-modules.git

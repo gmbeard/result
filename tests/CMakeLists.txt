@@ -17,7 +17,7 @@ target_link_libraries(
     result_tests
     PRIVATE
         Result::result
-        Catch2::Catch
+        Catch2::Catch2
 )
 
 add_test(
